@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Compare Excel Files</title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+</head>
+<body>
+<h1>Compare Excel Files</h1>
+<form th:action="@{/excel/compare}" method="post" enctype="multipart/form-data">
+    <label for="fileResource">File Gốc:</label>
+    <input type="file" id="fileResource" name="fileResource" required><br><br>
+    <label for="fileCompare">File so sánh:</label>
+    <input type="file" id="fileCompare" name="fileCompare" required><br><br>
+
+    <label for="ignore-row">Bỏ qua dòng:</label>
+    <input type="number" id="ignore-row" name="ignore-row" ><br><br>
+
+    <label for="ignore-column">Bỏ qua cột</label>
+    <input type="number" id="ignore-column" name="ignore-column" ><br><br>
+    <button type="submit">Compare</button>
+</form>
+<form th:action="@{/user/logout-post}" method="post">
+    <button type="submit">Logout</button>
+</form>
+<div class="result">
+    <p th:text="${result}" id="result1" style="display: none"></p>
+    <div id="tooltip" class="tooltip">Không có dữ liệu thay đổi so với bản gốc</div>
+</div>
+<script>
+    window.onload = function() {
+        var resultElement = document.getElementById('result1');
+        var resultValue = resultElement.textContent || resultElement.innerText;
+        console.log('result: ' + resultValue);
+        if (resultValue === '[Success]') {
+            var tooltip = document.getElementById('tooltip');
+            tooltip.style.display = 'block';
+            setTimeout(function() {
+                tooltip.style.display = 'none';
+            }, 3000);
+        }
+    }
+</script>
+</body>
+</html>
