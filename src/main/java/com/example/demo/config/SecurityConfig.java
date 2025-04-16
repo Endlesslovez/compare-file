@@ -14,6 +14,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -66,7 +67,19 @@ public class SecurityConfig {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
         ).addFilterBefore(
             databaseUserFilter, UsernamePasswordAuthenticationFilter.class
-        );
+        ).cors((cors) -> cors
+            .configurationSource(request -> {
+              var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+              var config = new org.springframework.web.cors.CorsConfiguration();
+              config.setAllowCredentials(true);
+              config.setAllowedOrigins(List.of("*"));
+              config.setAllowedHeaders(List.of("*"));
+              config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+              source.registerCorsConfiguration("/**", config);
+              return source.getCorsConfiguration(request);
+            })
+        )
+        .csrf(AbstractHttpConfigurer::disable);
     return http.build();
   }
 
