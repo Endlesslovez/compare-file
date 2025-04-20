@@ -34,7 +34,7 @@
         var tooltip = document.getElementById('tooltip');
         if (resultValue === '[Success]') {
             tooltip.textContent = 'Không có dữ liệu thay đổi so với bản gốc';
-        }else{
+        }else if(resultValue === '[Row_Not_Equals]') {
             tooltip.textContent = 'Số lượng dòng của hai File không bằng nhau';
         }
         tooltip.style.display = 'block';
