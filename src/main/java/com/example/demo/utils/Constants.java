@@ -5,5 +5,5 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public class Constants {
 
-    public static final String TILDE_SYMBOL = "~";
+    public static final String TILDE_SYMBOL = "~~~~~~";
 }

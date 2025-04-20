@@ -31,14 +31,32 @@
         var resultElement = document.getElementById('result1');
         var resultValue = resultElement.textContent || resultElement.innerText;
         console.log('result: ' + resultValue);
+        var tooltip = document.getElementById('tooltip');
         if (resultValue === '[Success]') {
-            var tooltip = document.getElementById('tooltip');
-            tooltip.style.display = 'block';
-            setTimeout(function() {
-                tooltip.style.display = 'none';
-            }, 3000);
+            tooltip.textContent = 'Không có dữ liệu thay đổi so với bản gốc';
+        }else{
+            tooltip.textContent = 'Số lượng dòng của hai File không bằng nhau';
         }
+        tooltip.style.display = 'block';
+        setTimeout(function() {
+            tooltip.style.display = 'none';
+        }, 3000);
     }
+
+    let inactivityTimeout;
+
+    function resetInactivityTimer() {
+        clearTimeout(inactivityTimeout);
+        inactivityTimeout = setTimeout(function() {
+            console.log("No clicks detected for 10 seconds.");
+        }, 10000); // 10 seconds
+    }
+
+    // Add event listener to reset the timer on any click
+    document.addEventListener('click', resetInactivityTimer);
+
+    // Initialize the timer when the page loads
+    resetInactivityTimer();
 </script>
 </body>
 </html>
