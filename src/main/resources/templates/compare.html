@@ -40,7 +40,7 @@
             }, 3000);
         }else if(resultValue === '[Row_Not_Equals]') {
             var tooltip_error = document.getElementById('tooltip_error');
-            tooltip_error.textContent = 'Số lượng dòng của hai File không bằng nhau';
+            tooltip_error.textContent = 'Số lượng bản ghi của hai File không bằng nhau';
             tooltip_error.style.display = 'block';
             setTimeout(function() {
                 tooltip_error.style.display = 'none';
@@ -50,18 +50,29 @@
     }
 
     let inactivityTimeout;
-
     function resetInactivityTimer() {
         clearTimeout(inactivityTimeout);
         inactivityTimeout = setTimeout(function() {
-            console.log("No clicks detected for 10 seconds.");
-        }, 10000); // 10 seconds
+
+            // Call the logout API
+            fetch('/user/logout-post', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }).then(response => {
+                if (response.ok) {
+                    // Redirect to the login page after successful logout
+                    window.location.href = '/user/login';
+                } else {
+                    console.error('Logout failed');
+                }
+            }).catch(error => {
+                console.error('Error during logout:', error);
+            });
+        }, 300000); // 5minutes (300000 milliseconds)
     }
-
-    // Add event listener to reset the timer on any click
     document.addEventListener('click', resetInactivityTimer);
-
-    // Initialize the timer when the page loads
     resetInactivityTimer();
 </script>
 </body>
