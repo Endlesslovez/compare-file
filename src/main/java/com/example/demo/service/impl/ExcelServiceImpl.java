@@ -9,6 +9,7 @@ import com.example.demo.service.ExcelService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -74,13 +75,15 @@ public class ExcelServiceImpl implements ExcelService {
         log.error("Row count of two sheets are not equal");
         return List.of("Row_Not_Equals");
       }
-      Set<Callable<Map<Integer, String>>> callables = new HashSet<>();
-      callables.add(() -> getAllDataSheet(sheet1, rowIgnore, columnIgnore));
-      callables.add(() -> getAllDataSheet(sheet2, rowIgnore, columnIgnore));
-      List<Future<Map<Integer, String>>> futureList = executor.invokeAll(callables);
+//      Set<Callable<Map<Integer, String>>> callables = new HashSet<>();
+//      callables.add(() -> getAllDataSheet(sheet1, rowIgnore, columnIgnore));
+//      callables.add(() -> getAllDataSheet(sheet2, rowIgnore, columnIgnore));
+//      List<Future<Map<Integer, String>>> futureList = executor.invokeAll(callables);
 
-      Map<Integer, String> valSheet1 = futureList.get(0).get();
-      Map<Integer, String> valSheet2 = futureList.get(1).get();
+      Map<Integer, String> valSheet1 = executor.submit(() -> getAllDataSheet(sheet1, rowIgnore, columnIgnore)).get();
+      Map<Integer, String> valSheet2 = executor.submit(() -> getAllDataSheet(sheet2, rowIgnore, columnIgnore)).get();
+//      Map<Integer, String> valSheet1 = futureList.get(0).get();
+//      Map<Integer, String> valSheet2 = futureList.get(1).get();
       log.info("Total element sheet1: [{}]", valSheet1.size());
       log.info("Total element sheet2: [{}]", valSheet2.size());
 
@@ -149,23 +152,22 @@ public class ExcelServiceImpl implements ExcelService {
           });
         }
 
-        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy_MM_dd");
         response.setContentType(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition",
-            "attachment; filename=" + LocalTime.now().format(dateTimeFormatter) + "_Thông tin lỗi"
-                + ".xlsx");
+            "attachment; filename=" + "Thong_Tin_Loi_"+ LocalDate.now().format(dateTimeFormatter) + ".xlsx");
         try (OutputStream out = response.getOutputStream()) {
           workbook1.write(out);
         } catch (IOException e) {
-          log.error("Error writing Excel file: {}", e.getMessage());
+          log.info("Error writing Excel file: {}", e.getMessage());
           throw e;
         }
       } else {
         return List.of("Success");
       }
     } catch (Exception e) {
-      log.error("[compareExcelFiles] Exception when read compare file: {}", e.getMessage());
+      log.info("[compareExcelFiles] Exception when read compare file: {}", e.getMessage());
       throw e;
     } finally {
       executor.shutdown();

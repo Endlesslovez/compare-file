@@ -24,23 +24,29 @@
 </form>
 <div class="result">
     <p th:text="${result}" id="result1" style="display: none"></p>
-    <div id="tooltip" class="tooltip">Không có dữ liệu thay đổi so với bản gốc</div>
+    <div id="tooltip" class="tooltip"></div>
+    <div id="tooltip_error" class="tooltip_error"></div>
 </div>
 <script>
     window.onload = function() {
         var resultElement = document.getElementById('result1');
         var resultValue = resultElement.textContent || resultElement.innerText;
-        console.log('result: ' + resultValue);
-        var tooltip = document.getElementById('tooltip');
         if (resultValue === '[Success]') {
+            var tooltip = document.getElementById('tooltip');
             tooltip.textContent = 'Không có dữ liệu thay đổi so với bản gốc';
+            tooltip.style.display = 'block';
+            setTimeout(function() {
+                tooltip.style.display = 'none';
+            }, 3000);
         }else if(resultValue === '[Row_Not_Equals]') {
-            tooltip.textContent = 'Số lượng dòng của hai File không bằng nhau';
+            var tooltip_error = document.getElementById('tooltip_error');
+            tooltip_error.textContent = 'Số lượng dòng của hai File không bằng nhau';
+            tooltip_error.style.display = 'block';
+            setTimeout(function() {
+                tooltip_error.style.display = 'none';
+            }, 3000);
         }
-        tooltip.style.display = 'block';
-        setTimeout(function() {
-            tooltip.style.display = 'none';
-        }, 3000);
+
     }
 
     let inactivityTimeout;
