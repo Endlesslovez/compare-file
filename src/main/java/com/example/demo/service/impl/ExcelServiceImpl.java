@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.compress.utils.FileNameUtils;
 import org.apache.poi.hssf.util.HSSFColor.HSSFColorPredefined;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellBase;
@@ -65,6 +66,14 @@ public class ExcelServiceImpl implements ExcelService {
   public List<String> compareExcelFiles(MultipartFile fileExcel, MultipartFile filePdf,
       HttpServletResponse response,
       int rowIgnore, int columnIgnore) {
+   boolean isValidateExtension =  validateFileExtension(fileExcel, filePdf);
+   if(isValidateExtension){
+     return List.of("FILE_EXTENSION_NOT_FOUND");
+   }
+   boolean isMaxSize = validateSize(fileExcel, filePdf);
+   if(isMaxSize){
+     return List.of("FILE_MAX_SIZE");
+   }
     var executor = Executors.newFixedThreadPool(5);
     Map<Integer, FindCompareDto> errorMaps = new HashMap<>();
     log.info("FileName1: [{}]", fileExcel.getOriginalFilename());
@@ -110,6 +119,17 @@ public class ExcelServiceImpl implements ExcelService {
     }
 
     return null;
+  }
+
+  private boolean validateFileExtension(MultipartFile fileExcel, MultipartFile filePdf) {
+    String extensionPdf = FileNameUtils.getExtension(filePdf.getOriginalFilename());
+    String extensionXlsx = FileNameUtils.getExtension(fileExcel.getOriginalFilename());
+      return !".pdf".equalsIgnoreCase(extensionPdf) || !".xlsx".equalsIgnoreCase(extensionXlsx);
+  }
+
+  private boolean validateSize(MultipartFile fileExcel, MultipartFile filePdf){
+    long maxSize = 10 * 1024 * 1024; // 10MB
+    return fileExcel.getSize() > maxSize || filePdf.getSize() > maxSize;
   }
 
 

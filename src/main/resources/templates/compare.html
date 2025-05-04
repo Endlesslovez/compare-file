@@ -45,6 +45,20 @@
             setTimeout(function() {
                 tooltip_error.style.display = 'none';
             }, 3000);
+        }else if(resultValue== '[FILE_EXTENSION_NOT_FOUND]'){
+           var tooltip_error = document.getElementById('tooltip_error');
+            tooltip_error.textContent = 'File không đúng định dạng(.pfd, .xlsx).';
+            tooltip_error.style.display = 'block';
+            setTimeout(function() {
+                tooltip_error.style.display = 'none';
+            }, 3000);
+        }else if(resultValue== '[FILE_MAX_SIZE]'){
+           var tooltip_error = document.getElementById('tooltip_error');
+            tooltip_error.textContent = 'File quá dung lượng quy định (10MB).';
+            tooltip_error.style.display = 'block';
+            setTimeout(function() {
+                tooltip_error.style.display = 'none';
+            }, 3000);
         }
 
     }
