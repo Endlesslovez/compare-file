@@ -9,7 +9,9 @@ import lombok.*;
 @AllArgsConstructor
 public class FindCompareDto {
 
-    private String valSource;
+    private String valIncorrect;
 
-    private String valCompare;
+    private String valCorrect;
+
+    private long numericalOrder;
 }

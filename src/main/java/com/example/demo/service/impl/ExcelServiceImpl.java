@@ -3,25 +3,30 @@ package com.example.demo.service.impl;
 
 import static com.example.demo.utils.Constants.TILDE_SYMBOL;
 
+import com.aspose.pdf.AbsorbedCell;
+import com.aspose.pdf.AbsorbedRow;
+import com.aspose.pdf.AbsorbedTable;
+import com.aspose.pdf.Document;
+import com.aspose.pdf.TableAbsorber;
+import com.aspose.pdf.TextFragment;
+import com.aspose.pdf.TextFragmentCollection;
+import com.example.demo.controller.LoginController;
 import com.example.demo.dto.FindCompareDto;
 import com.example.demo.dto.config.KeyResult;
 import com.example.demo.service.ExcelService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +41,7 @@ import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
@@ -52,117 +58,43 @@ import org.springframework.web.multipart.MultipartFile;
 public class ExcelServiceImpl implements ExcelService {
 
   private final KeyResult keyResult;
+  private final LoginController loginController;
 
   @Override
   @SneakyThrows
-  public List<String> compareExcelFiles(MultipartFile file1, MultipartFile file2,
+  public List<String> compareExcelFiles(MultipartFile fileExcel, MultipartFile filePdf,
       HttpServletResponse response,
       int rowIgnore, int columnIgnore) {
     var executor = Executors.newFixedThreadPool(5);
     Map<Integer, FindCompareDto> errorMaps = new HashMap<>();
-    log.info("FileName1: [{}]", file1.getOriginalFilename());
-    log.info("FileName2: [{}]", file2.getOriginalFilename());
+    log.info("FileName1: [{}]", fileExcel.getOriginalFilename());
+    log.info("FileName2: [{}]", filePdf.getOriginalFilename());
 
-    try (Workbook workbook1 = new XSSFWorkbook(
-        file1.getInputStream()); Workbook workbook2 = new XSSFWorkbook(file2.getInputStream())) {
-      Sheet sheet1 = workbook1.getSheetAt(0);
-      Sheet sheet2 = workbook2.getSheetAt(0);
+    try (Workbook workbookExcel = new XSSFWorkbook(
+        fileExcel.getInputStream())) {
+      int numOfSheet = workbookExcel.getNumberOfSheets();
+      Sheet sheet1 = workbookExcel.getSheetAt(0);
 
-      int rowCountSheet1 = sheet1.getPhysicalNumberOfRows();
-      int rowCountSheet2 = sheet2.getPhysicalNumberOfRows();
+      Map<Integer, String> resultDataExCel = executor.submit(
+          () -> getAllDataSheet(sheet1, rowIgnore, columnIgnore)).get();
+      List<String> resultDataPdf = executor.submit(() -> handlePdf(filePdf, numOfSheet)).get();
+      resultDataPdf.removeLast();
 
-      if (rowCountSheet1 != rowCountSheet2) {
-        log.error("Row count of two sheets are not equal");
-        return List.of("Row_Not_Equals");
-      }
-//      Set<Callable<Map<Integer, String>>> callables = new HashSet<>();
-//      callables.add(() -> getAllDataSheet(sheet1, rowIgnore, columnIgnore));
-//      callables.add(() -> getAllDataSheet(sheet2, rowIgnore, columnIgnore));
-//      List<Future<Map<Integer, String>>> futureList = executor.invokeAll(callables);
-
-      Map<Integer, String> valSheet1 = executor.submit(() -> getAllDataSheet(sheet1, rowIgnore, columnIgnore)).get();
-      Map<Integer, String> valSheet2 = executor.submit(() -> getAllDataSheet(sheet2, rowIgnore, columnIgnore)).get();
-//      Map<Integer, String> valSheet1 = futureList.get(0).get();
-//      Map<Integer, String> valSheet2 = futureList.get(1).get();
-      log.info("Total element sheet1: [{}]", valSheet1.size());
-      log.info("Total element sheet2: [{}]", valSheet2.size());
-
-      valSheet2.forEach((k, v) -> {
-        if (valSheet1.containsKey(k)) {
-          String val1 = valSheet1.get(k);
-          if (!val1.equals(v)) {
-            errorMaps.put(k, FindCompareDto.builder().valSource(val1).valCompare(v).build());
+      AtomicInteger countInx = new AtomicInteger(1);
+      resultDataExCel.forEach((k, v) -> {
+        if (resultDataPdf.size() > countInx.get()) {
+          String elementPdf = resultDataPdf.get(countInx.get());
+          if (!elementPdf.equals(v)) {
+            errorMaps.put(k,
+                FindCompareDto.builder().valCorrect(elementPdf).valIncorrect(v).build());
           }
+          countInx.getAndIncrement();
         }
       });
+      log.info("Total element sheet1: [{}]", resultDataExCel.size());
+
       if (!CollectionUtils.isEmpty(errorMaps)) {
-        Iterator<Row> rowIterator = sheet1.rowIterator();
-        for (int i = 0; i < rowIgnore; i++) {
-          rowIterator.next();
-        }
-
-        Row rowTitle = sheet1.getRow(rowIgnore - 1);
-        Iterator<Cell> cellIteratorTitle = rowTitle.cellIterator();
-        int lastCellNumTitle = rowTitle.getLastCellNum();
-
-        List<String> titleList = new ArrayList<>();
-        while (cellIteratorTitle.hasNext()) {
-          titleList.add(cellIteratorTitle.next().getStringCellValue());
-        }
-        for (String s : titleList) {
-          rowTitle.createCell(lastCellNumTitle++).setCellValue(s);
-        }
-        // set Cell font color error
-        CellStyle cellStyleColor = workbook1.createCellStyle();
-        Font font = workbook1.createFont();
-        font.setColor(HSSFColorPredefined.RED.getIndex());
-        cellStyleColor.setFont(font);
-
-        // set color for background
-        CellStyle cellStyleBackground = workbook1.createCellStyle();
-        cellStyleBackground.setFillBackgroundColor(IndexedColors.YELLOW.getIndex());
-        cellStyleBackground.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        cellStyleBackground.setFillForegroundColor(IndexedColors.YELLOW.getIndex());
-
-        while (rowIterator.hasNext()) {
-          Row row = rowIterator.next();
-          int cellCount = row.getLastCellNum();
-          log.info("Cell count [{}]", cellCount);
-          log.info("Content Error: [{}]", errorMaps.get(row.getRowNum()));
-          FindCompareDto errorCompare = errorMaps.get(row.getRowNum());
-          if (errorCompare == null) {
-            continue;
-          }
-          Iterator<Cell> cellIterator = row.cellIterator();
-          while (cellIterator.hasNext()) {
-            cellIterator.next().setCellStyle(cellStyleBackground);
-          }
-          Map<Integer, String> valueError = findTextError(errorCompare.getValSource(),
-              errorCompare.getValCompare());
-          if (CollectionUtils.isEmpty(valueError)) {
-            continue;
-          }
-
-          valueError.forEach((k, v) -> {
-            Cell cell = row.createCell(cellCount + k);
-            if (cell != null) {
-              cell.setCellValue(v);
-              cell.setCellStyle(cellStyleColor);
-            }
-          });
-        }
-
-        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy_MM_dd");
-        response.setContentType(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        response.setHeader("Content-Disposition",
-            "attachment; filename=" + "Thong_Tin_Loi_"+ LocalDate.now().format(dateTimeFormatter) + ".xlsx");
-        try (OutputStream out = response.getOutputStream()) {
-          workbook1.write(out);
-        } catch (IOException e) {
-          log.info("Error writing Excel file: {}", e.getMessage());
-          throw e;
-        }
+        handleException(errorMaps, sheet1, workbookExcel, response, rowIgnore, fileExcel.getOriginalFilename());
       } else {
         return List.of("Success");
       }
@@ -180,13 +112,129 @@ public class ExcelServiceImpl implements ExcelService {
     return null;
   }
 
+
+  @SneakyThrows
+  private List<String> handlePdf(MultipartFile filePdf, int numOfSheet) {
+    List<String> list = new ArrayList<>();
+    try (Document pdfDocument = new Document(filePdf.getInputStream())) {
+      TableAbsorber absorber = new TableAbsorber();
+
+      int sizePagePdf = pdfDocument.getPages().size();
+      log.info("Size Page in Pdf file: {}, numOfSheet: {}", sizePagePdf, numOfSheet);
+      int sizePageNew = numOfSheet > 1 ? sizePagePdf - 1 : sizePagePdf;
+
+      log.info("ResultSizeExcel: {}, ResultSizePdf: {}", numOfSheet,
+          sizePagePdf);
+      if (sizePageNew != numOfSheet) {
+        return List.of("Row_Not_Equals");
+      }
+      for (int i = 1; i <= sizePageNew; i++) {
+        absorber.visit(pdfDocument.getPages().get_Item(i));
+      }
+
+      for (AbsorbedTable table : absorber.getTableList()) {
+        for (AbsorbedRow row : table.getRowList()) {
+          StringBuilder stringBuilder = new StringBuilder();
+          for (AbsorbedCell cell : row.getCellList()) {
+            TextFragmentCollection fragments = cell.getTextFragments();
+            String textCell = "";
+
+            for (TextFragment tf : fragments) {
+              textCell = textCell.concat(tf.getText());
+            }
+            stringBuilder.append(textCell.replace(",", "").replaceAll("\\s+", ""))
+                .append(TILDE_SYMBOL);
+          }
+          String e = new String(stringBuilder.toString().getBytes(StandardCharsets.UTF_8),
+              StandardCharsets.UTF_8);
+          list.add(e);
+        }
+      }
+    } catch (Exception e) {
+      log.info("Exception when handle Pdf: ", e);
+    }
+
+    return list;
+  }
+
+  private void handleException(Map<Integer, FindCompareDto> errorMaps, Sheet sheet1,
+      Workbook workbookExcel, HttpServletResponse response, int rowIgnore, String fileName) {
+    Iterator<Row> rowIterator = sheet1.rowIterator();
+    for (int i = 0; i < rowIgnore; i++) {
+      rowIterator.next();
+    }
+
+    Row rowTitle = sheet1.getRow(rowIgnore - 1);
+    Iterator<Cell> cellIteratorTitle = rowTitle.cellIterator();
+    int lastCellNumTitle = rowTitle.getLastCellNum();
+
+    List<String> titleList = new ArrayList<>();
+    while (cellIteratorTitle.hasNext()) {
+      titleList.add(cellIteratorTitle.next().getStringCellValue());
+    }
+    for (String s : titleList) {
+      rowTitle.createCell(lastCellNumTitle++).setCellValue(s);
+    }
+    // set Cell font color error
+    CellStyle cellStyleColor = workbookExcel.createCellStyle();
+    Font font = workbookExcel.createFont();
+    font.setColor(HSSFColorPredefined.RED.getIndex());
+    cellStyleColor.setFont(font);
+
+    // set color for background
+    CellStyle cellStyleBackground = workbookExcel.createCellStyle();
+    cellStyleBackground.setFillBackgroundColor(IndexedColors.YELLOW.getIndex());
+    cellStyleBackground.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+    cellStyleBackground.setFillForegroundColor(IndexedColors.YELLOW.getIndex());
+
+    while (rowIterator.hasNext()) {
+      Row row = rowIterator.next();
+      int cellCount = row.getLastCellNum();
+      log.info("Cell count [{}]", cellCount);
+      log.info("Content Error: [{}]", errorMaps.get(row.getRowNum()));
+      FindCompareDto errorCompare = errorMaps.get(row.getRowNum());
+      if (errorCompare == null) {
+        continue;
+      }
+      Iterator<Cell> cellIterator = row.cellIterator();
+      while (cellIterator.hasNext()) {
+        cellIterator.next().setCellStyle(cellStyleBackground);
+      }
+      Map<Integer, String> valueError = findTextError(errorCompare.getValCorrect(),
+          errorCompare.getValIncorrect());
+      if (CollectionUtils.isEmpty(valueError)) {
+        continue;
+      }
+
+      valueError.forEach((k, v) -> {
+        Cell cell = row.createCell(cellCount + k);
+        if (cell != null) {
+          cell.setCellValue(v);
+          cell.setCellStyle(cellStyleColor);
+        }
+      });
+    }
+
+    DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy_MM_dd");
+    response.setContentType(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    response.setHeader("Content-Disposition",
+        "attachment; filename=" + "Thong_Tin_Loi_" + fileName +"_" + LocalDate.now().format(dateTimeFormatter)
+            + ".xlsx");
+    try (OutputStream out = response.getOutputStream()) {
+      workbookExcel.write(out);
+    } catch (IOException e) {
+      log.info("Error writing Excel file: ", e);
+    }
+  }
+
   private Map<Integer, String> findTextError(String valSource, String valCompare) {
     Map<Integer, String> result = new HashMap<>();
     String[] source = valSource.split(TILDE_SYMBOL);
     String[] compare = valCompare.split(TILDE_SYMBOL);
     for (int i = 0; i < source.length; i++) {
       if (!source[i].equals(compare[i])) {
-        result.put(i, compare[i]);
+        result.put(i, source[i]);
       }
     }
     return result;
@@ -211,13 +259,27 @@ public class ExcelServiceImpl implements ExcelService {
         Cell cell = cellIterator.next();
         log.info("Row: [{}] cell [{}]", row.getRowNum(), cell.getColumnIndex());
         ((CellBase) cell).setCellType(CellType.STRING);
-        valRow.append(cell.getStringCellValue()).append(TILDE_SYMBOL);
+        valRow.append(getMergedCellValue(sheet, row.getRowNum(), cell.getColumnIndex(), cell))
+            .append(TILDE_SYMBOL);
       }
-      result.put(row.getRowNum(), valRow.toString());
+
+      result.put(row.getRowNum(), valRow.toString().replace(",", "").replaceAll("\\s+", ""));
     }
     return result;
   }
 
+  public static String getMergedCellValue(Sheet sheet, int row, int col, Cell cellResult) {
+    for (CellRangeAddress range : sheet.getMergedRegions()) {
+      if (range.isInRange(row, col)) {
+        Row firstRow = sheet.getRow(range.getFirstRow());
+        if (firstRow != null) {
+          Cell cell = firstRow.getCell(range.getFirstColumn());
+          return cell.getStringCellValue();
+        }
+      }
+    }
+    return cellResult.getStringCellValue();
+  }
 
   @Override
   @SneakyThrows
